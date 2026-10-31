@@ -18,10 +18,12 @@ async def start(
     welcome_message = (
         "Welcome to EmpirE Downloader! 🚀\n\n"
         "به امپایر دانلودر خوش آمدید! 🚀\n\n"
-        "Send a link to start downloading."
+        "Send a link to start downloading.\n"
+        "برای شروع دانلود، لینک موردنظرت را ارسال کن."
     )
 
-    await update.message.reply_text(welcome_message)
+    if update.message:
+        await update.message.reply_text(welcome_message)
 
 
 def build_application():
@@ -32,7 +34,11 @@ def build_application():
             "BOT_TOKEN is missing. Check your environment variables."
         )
 
-    application = Application.builder().token(BOT_TOKEN).build()
+    application = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .build()
+    )
 
     application.add_handler(
         CommandHandler("start", start)
