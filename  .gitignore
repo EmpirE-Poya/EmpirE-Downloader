@@ -22,3 +22,19 @@ env/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Test and build files
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Downloaded files and databases
+downloads/
+*.db
+*.sqlite3
+
+# Telegram session files
+*.session
+*.session-journal
