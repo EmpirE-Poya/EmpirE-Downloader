@@ -14,7 +14,6 @@ def main():
     logging.info("EmpirE Downloader is starting...")
 
     application = build_application()
-
     application.run_polling()
 
 
