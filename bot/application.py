@@ -11,7 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-from config import BOT_TOKEN, LOG_LEVEL
+from config import BOT_TOKEN, LOG_LEVEL, DOWNLOAD_DIR
 from downloader.engine import DownloadError, download_media
 
 
@@ -91,7 +91,20 @@ async def handle_link(
 
     finally:
         if file_path:
-            Path(file_path).unlink(missing_ok=True)
+            try:
+                download_path = Path(file_path).resolve()
+                download_dir = DOWNLOAD_DIR.resolve()
+
+                if download_path.is_relative_to(download_dir):
+                    download_path.unlink(missing_ok=True)
+                else:
+                    logger.error(
+                        "Refusing to delete file outside download directory: %s",
+                        download_path,
+                    )
+
+            except OSError:
+                logger.exception("Failed to remove downloaded file.")
 
 
 def build_application():
