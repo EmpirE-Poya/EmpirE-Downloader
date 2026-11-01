@@ -1,12 +1,21 @@
 
+import logging
+from pathlib import Path
+
 from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
+    MessageHandler,
     ContextTypes,
+    filters,
 )
 
-from config import BOT_TOKEN
+from config import BOT_TOKEN, LOG_LEVEL
+from downloader.engine import DownloadError, download_media
+
+
+logger = logging.getLogger(__name__)
 
 
 async def start(
@@ -24,6 +33,65 @@ async def start(
 
     if update.message:
         await update.message.reply_text(welcome_message)
+
+
+async def handle_link(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    """Handle links sent by users."""
+
+    if not update.message or not update.message.text:
+        return
+
+    url = update.message.text.strip()
+
+    status_message = await update.message.reply_text(
+        "⏳ Downloading... Please wait.\n"
+        "⏳ در حال دانلود... لطفاً صبر کن."
+    )
+
+    file_path = None
+
+    try:
+        file_path = await download_media(url)
+
+        await status_message.edit_text(
+            "📤 Download completed. Sending your file...\n"
+            "📤 دانلود تمام شد. در حال ارسال فایل..."
+        )
+
+        with open(file_path, "rb") as media_file:
+            await update.message.reply_document(
+                document=media_file,
+                filename=Path(file_path).name,
+                read_timeout=120,
+                write_timeout=120,
+                connect_timeout=30,
+            )
+
+        await status_message.edit_text(
+            "✅ Done!\n"
+            "✅ انجام شد!"
+        )
+
+    except DownloadError as error:
+        await status_message.edit_text(
+            f"❌ Download failed:\n{error}\n\n"
+            "❌ دانلود ناموفق بود."
+        )
+
+    except Exception:
+        logger.exception("Error while processing user link.")
+
+        await status_message.edit_text(
+            "❌ Something went wrong while sending the file.\n"
+            "❌ هنگام ارسال فایل مشکلی پیش آمد."
+        )
+
+    finally:
+        if file_path:
+            Path(file_path).unlink(missing_ok=True)
 
 
 def build_application():
@@ -44,4 +112,24 @@ def build_application():
         CommandHandler("start", start)
     )
 
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_link)
+    )
+
     return application
+
+
+def main():
+    logging.basicConfig(
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),
+    )
+
+    logging.info("EmpirE Downloader is starting...")
+
+    application = build_application()
+    application.run_polling()
+
+
+if __name__ == "__main__":
+    main()
