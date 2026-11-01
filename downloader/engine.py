@@ -5,7 +5,11 @@ from pathlib import Path
 
 import yt_dlp
 
-from config import DOWNLOAD_DIR, MAX_FILE_SIZE_MB
+from config import (
+    DOWNLOAD_DIR,
+    MAX_FILE_SIZE_MB,
+)
+from utils.helpers import is_valid_url
 
 
 logger = logging.getLogger(__name__)
@@ -33,14 +37,26 @@ def _download_sync(url: str) -> str:
     try:
         with yt_dlp.YoutubeDL(options) as downloader:
             info = downloader.extract_info(url, download=True)
+
+            if not info:
+                raise DownloadError("No media information was returned.")
+
             file_path = downloader.prepare_filename(info)
+
+            requested_downloads = info.get("requested_downloads") or []
+            if requested_downloads:
+                file_path = requested_downloads[0].get(
+                    "filepath", file_path
+                )
 
         path = Path(file_path)
 
-        if not path.exists():
+        if not path.is_file():
             raise DownloadError("Downloaded file was not found.")
 
-        if path.stat().st_size > MAX_FILE_SIZE_MB * 1024 * 1024:
+        max_size = MAX_FILE_SIZE_MB * 1024 * 1024
+
+        if path.stat().st_size > max_size:
             path.unlink(missing_ok=True)
             raise DownloadError(
                 f"File exceeds the {MAX_FILE_SIZE_MB} MB limit."
@@ -50,6 +66,7 @@ def _download_sync(url: str) -> str:
 
     except DownloadError:
         raise
+
     except Exception as error:
         logger.exception("Download failed.")
         raise DownloadError(
@@ -60,7 +77,7 @@ def _download_sync(url: str) -> str:
 async def download_media(url: str) -> str:
     """Download media without blocking the bot event loop."""
 
-    if not url or not url.startswith(("http://", "https://")):
+    if not is_valid_url(url):
         raise DownloadError(
             "Please provide a valid HTTP or HTTPS link."
         )
@@ -70,6 +87,7 @@ async def download_media(url: str) -> str:
 
     except DownloadError:
         raise
+
     except Exception as error:
         logger.exception("Unexpected download error.")
         raise DownloadError(
